@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" /> 
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BrewWater AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -272,11 +272,13 @@ const STYLES = [
 ];
 
 const SALTS = {
-  gypsum:          {label:"Gypsum",           formula:"CaSO4",  ca:61.5, so4:147.4, mg:0,  na:0,  cl:0,   hco3:0  },
-  calciumChloride: {label:"Calcium Chloride", formula:"CaCl2",  ca:72,   so4:0,     mg:0,  na:0,  cl:127, hco3:0  },
-  epsomSalt:       {label:"Epsom Salt",       formula:"MgSO4",  ca:0,    so4:103,   mg:26, na:0,  cl:0,   hco3:0  },
-  bakingSoda:      {label:"Baking Soda",      formula:"NaHCO3", ca:0,    so4:0,     mg:0,  na:72, cl:0,   hco3:191},
-  chalk:           {label:"Chalk",            formula:"CaCO3",  ca:106,  so4:0,     mg:0,  na:0,  cl:0,   hco3:158},
+  gypsum:          {label:"Gypsum",           formula:"CaSO4",    ca:61.5, so4:147.4, mg:0,  na:0,  cl:0,   hco3:0  },
+  calciumChloride: {label:"Calcium Chloride", formula:"CaCl2",    ca:72,   so4:0,     mg:0,  na:0,  cl:127, hco3:0  },
+  epsomSalt:       {label:"Epsom Salt",       formula:"MgSO4",    ca:0,    so4:103,   mg:26, na:0,  cl:0,   hco3:0  },
+  bakingSoda:      {label:"Baking Soda",      formula:"NaHCO3",   ca:0,    so4:0,     mg:0,  na:72, cl:0,   hco3:191},
+  picklingLime:    {label:"Pickling Lime",    formula:"Ca(OH)2",  ca:143,  so4:0,     mg:0,  na:0,  cl:0,   hco3:435},
+  tableSalt:       {label:"Table Salt",       formula:"NaCl",     ca:0,    so4:0,     mg:0,  na:104,cl:160, hco3:0  },
+  chalk:           {label:"Chalk (avoid)",    formula:"CaCO3",    ca:106,  so4:0,     mg:0,  na:0,  cl:0,   hco3:158},
 };
 
 const ION_FIELDS = [
@@ -311,7 +313,7 @@ function calc() {
   const t = style.t;
   const f = (S.batch||20) / 10;
   const base = S.ro ? {ca:0,mg:0,na:0,cl:0,so4:0,hco3:0,ph:S.profile.ph} : applyDilution(S.profile, S.dilution);
-  const add = {gypsum:0,calciumChloride:0,epsomSalt:0,bakingSoda:0,chalk:0};
+  const add = {gypsum:0,calciumChloride:0,epsomSalt:0,bakingSoda:0,picklingLime:0};
   const gn = (def, ppm) => Math.max(0, (def/ppm)*f);
   const pf = (g, ppm) => (g/f)*ppm;
   const cap = (g, sk, ik, cur) => {
@@ -337,15 +339,16 @@ function calc() {
   }
 
   const caAft=mid.ca+pf(add.gypsum,SALTS.gypsum.ca)+pf(add.calciumChloride,SALTS.calciumChloride.ca);
-  if(caAft<t.ca){let g=gn(t.ca-caAft,SALTS.chalk.ca);add.chalk=cap(g,"chalk","ca",caAft);}
+  // Use Pickling Lime (Ca(OH)2) — not Chalk — to top up Ca deficit. Chalk is unreliable in a mash.
+  if(caAft<t.ca){let g=gn(t.ca-caAft,SALTS.picklingLime.ca);add.picklingLime=cap(g,"picklingLime","ca",caAft);}
 
   const fin={
-    ca:  Math.round(mid.ca+pf(add.gypsum,SALTS.gypsum.ca)+pf(add.calciumChloride,SALTS.calciumChloride.ca)+pf(add.chalk,SALTS.chalk.ca)),
+    ca:  Math.round(mid.ca+pf(add.gypsum,SALTS.gypsum.ca)+pf(add.calciumChloride,SALTS.calciumChloride.ca)+pf(add.picklingLime,SALTS.picklingLime.ca)),
     mg:  Math.round(mid.mg),
     na:  Math.round(mid.na),
     so4: Math.round(mid.so4+pf(add.gypsum,SALTS.gypsum.so4)),
     cl:  Math.round(mid.cl+pf(add.calciumChloride,SALTS.calciumChloride.cl)),
-    hco3:Math.round(mid.hco3+pf(add.chalk,SALTS.chalk.hco3)),
+    hco3:Math.round(mid.hco3+pf(add.picklingLime,SALTS.picklingLime.hco3)),
   };
 
   const ratio=fin.so4/(fin.cl||1);
@@ -356,24 +359,46 @@ function calc() {
   else if(ratio<1){rl="Malt-Forward";rd="Soft, round, malt character";}
 
   const ra=calcRA(fin.ca,fin.mg,fin.hco3);
+  const darkStyle=["Dark","Malt-Forward"].includes(style.cat);
+  const paleStyle=["Hop-Forward","Lager","Wheat","Belgian"].includes(style.cat);
   let raC="balanced",raI="Balanced water profile",raD="Suitable for most styles";
-  if(ra<0){raC="pale";raI="Suitable for pale beers";raD="Low alkalinity — great for lagers, IPAs, pilsners";}
-  else if(ra>100){raC="dark";raI="Better for dark beers";raD="High alkalinity — good for stouts, porters, dark ales";}
+  if(ra<0){
+    raC="pale";raI="Low Residual Alkalinity";
+    raD=paleStyle?"Good match — low RA suits "+style.name:"Your selected style ("+style.name+") is a dark beer — low RA may make mash pH drop too far. Consider raising bicarbonate.";
+  } else if(ra>100){
+    raC="dark";raI="High Residual Alkalinity";
+    raD=darkStyle?"Good match — high RA suits "+style.name:"Your selected style ("+style.name+") is a pale beer — high RA will push mash pH too high. Dilute with RO water or add acid.";
+  } else {
+    raD=darkStyle?"RA is balanced but "+style.name+" may benefit from slightly higher alkalinity.":paleStyle?"RA is balanced — suitable for "+style.name+".":"Balanced RA — suitable for most styles.";
+  }
 
   const IONS=[{k:"ca",l:"Calcium"},{k:"mg",l:"Magnesium"},{k:"na",l:"Sodium"},{k:"cl",l:"Chloride"},{k:"so4",l:"Sulfate"},{k:"hco3",l:"Bicarbonate"}];
   // Warn only when SOURCE water already exceeds target — these ions can't be reduced by adding salts, RO dilution is needed
   const warnings=IONS.filter(({k})=>(base[k]||0)>(t[k]||0)*1.1).map(({k,l})=>`${l} is ${Math.round(base[k])} ppm in your source water but the ${style.name} target is ${t[k]} ppm. Salt additions cannot reduce this — blend with RO water to dilute.`);
 
   const ins=[];
-  if(fin.so4>150)ins.push({t:"i",m:"High sulfate (>150 ppm) enhances hop bitterness and dryness."});
-  if(fin.cl>100) ins.push({t:"i",m:"High chloride (>100 ppm) enhances malt roundness and body."});
-  if(fin.hco3>100)ins.push({t:"i",m:"High bicarbonate raises mash alkalinity — consider acid additions to hit target mash pH."});
-  if(fin.ca>=50) ins.push({t:"i",m:"Calcium above 50 ppm supports enzyme activity and yeast health."});
-  if(fin.mg>30)  ins.push({t:"w",m:"Magnesium above 30 ppm can add astringency — keep it moderate."});
-  if(add.chalk>0)ins.push({t:"w",m:"Chalk dissolves poorly unless the wort is acidified first."});
-  if(add.gypsum>0)ins.push({t:"i",m:"Gypsum adds calcium and sulfate — classic for hop-forward styles."});
-  if(add.calciumChloride>0)ins.push({t:"i",m:"Calcium chloride softens the palate and promotes malt character."});
-  if(!ins.length)ins.push({t:"i",m:"Your source water closely matches this style — minimal additions needed!"});
+  // ── Ion ceiling warnings (Bru'n Water upper limits)
+  if(fin.so4>350) ins.push({t:"w",m:"Sulfate above 350 ppm risks sulfury aroma in the finished beer. Consider reducing your Gypsum addition."});
+  else if(fin.so4>150&&fin.cl>100) ins.push({t:"w",m:"High sulfate AND high chloride together can produce a harsh, minerally flavour. Consider moderating one of them."});
+  if(fin.na>100)  ins.push({t:"w",m:"Sodium above 100 ppm can make beer taste harsh. Bru'n Water recommends keeping sodium below 60 ppm in practice."});
+  if(fin.mg>40)   ins.push({t:"w",m:"Magnesium above 40 ppm is not recommended — it adds astringency and can stress yeast."});
+  else if(fin.mg>30) ins.push({t:"w",m:"Magnesium above 30 ppm can add astringency — keep it moderate."});
+  // ── Ratio caveat at low chloride
+  if(fin.cl<25)   ins.push({t:"i",m:"Chloride is below 25 ppm — the SO4:Cl ratio provides little flavour guidance at this level."});
+  // ── Positive ion insights
+  if(fin.so4>150) ins.push({t:"i",m:"High sulfate (>150 ppm) enhances hop bitterness and dries the finish."});
+  if(fin.cl>100)  ins.push({t:"i",m:"High chloride (>100 ppm) enhances malt roundness, body and fullness."});
+  if(fin.hco3>100)ins.push({t:"i",m:"High bicarbonate raises mash alkalinity — consider lactic or phosphoric acid to hit your target mash pH of 5.2–5.5."});
+  if(fin.ca>=50)  ins.push({t:"i",m:"Calcium above 50 ppm supports enzyme activity, yeast health and beer clarity."});
+  if(fin.ca<40)   ins.push({t:"w",m:"Calcium is below 40 ppm — this minimum is recommended to prevent beerstone and support yeast flocculation."});
+  // ── Salt-specific notes
+  if(add.picklingLime>0) ins.push({t:"i",m:"Pickling Lime adds calcium and alkalinity reliably — it dissolves fully unlike Chalk. Use food-grade Ca(OH)2 and dose carefully as it raises pH strongly."});
+  if(add.gypsum>0)       ins.push({t:"i",m:"Gypsum adds calcium and sulfate — the classic choice for hop-forward styles."});
+  if(add.calciumChloride>0) ins.push({t:"i",m:"Calcium chloride promotes malt fullness and rounds the palate."});
+  if(add.bakingSoda>0)   ins.push({t:"i",m:"Baking Soda raises alkalinity for dark beers — watch sodium levels, keep below 100 ppm."});
+  // ── Chlorine reminder for tap water users
+  if(!S.ro&&S.dilution<100) ins.push({t:"w",m:"Using tap water? Add 1 Campden tablet (potassium metabisulfite) per 75L to neutralise chlorine/chloramine — even tiny amounts cause medicinal off-flavours."});
+  if(!ins.length) ins.push({t:"i",m:"Your source water closely matches this style — minimal additions needed!"});
 
   const src2=S.ro?{ca:0,mg:0,na:0,cl:0,so4:0,hco3:0}:applyDilution(S.profile,S.dilution);
   const suited=[],notSuited=[];
@@ -384,7 +409,7 @@ function calc() {
   });
 
   return {
-    add:{gypsum:+add.gypsum.toFixed(2),calciumChloride:+add.calciumChloride.toFixed(2),epsomSalt:+add.epsomSalt.toFixed(2),bakingSoda:+add.bakingSoda.toFixed(2),chalk:+add.chalk.toFixed(2)},
+    add:{gypsum:+add.gypsum.toFixed(2),calciumChloride:+add.calciumChloride.toFixed(2),epsomSalt:+add.epsomSalt.toFixed(2),bakingSoda:+add.bakingSoda.toFixed(2),picklingLime:+add.picklingLime.toFixed(2)},
     // rawSource = exact values from input fields (no rounding, no dilution applied)
     rawSource:{ca:S.profile.ca,mg:S.profile.mg,na:S.profile.na,cl:S.profile.cl,so4:S.profile.so4,hco3:S.profile.hco3,ph:S.profile.ph},
     base:{ca:Math.round(base.ca),mg:Math.round(base.mg),na:Math.round(base.na),cl:Math.round(base.cl),so4:Math.round(base.so4),hco3:Math.round(base.hco3)},
@@ -394,7 +419,7 @@ function calc() {
 
 function render(r) {
   const IONS=[{k:"ca",l:"Ca"},{k:"mg",l:"Mg"},{k:"na",l:"Na"},{k:"cl",l:"Cl"},{k:"so4",l:"SO4"},{k:"hco3",l:"HCO3"}];
-  const SL=[{key:"gypsum",...SALTS.gypsum},{key:"calciumChloride",...SALTS.calciumChloride},{key:"epsomSalt",...SALTS.epsomSalt},{key:"bakingSoda",...SALTS.bakingSoda},{key:"chalk",...SALTS.chalk}];
+  const SL=[{key:"gypsum",...SALTS.gypsum},{key:"calciumChloride",...SALTS.calciumChloride},{key:"epsomSalt",...SALTS.epsomSalt},{key:"bakingSoda",...SALTS.bakingSoda},{key:"picklingLime",...SALTS.picklingLime},{key:"tableSalt",...SALTS.tableSalt}];
 
   const warnH=r.warnings.length?`<div class="warn-box fade-in"><div class="wt">Note</div>${r.warnings.map(w=>`<p>- ${w}</p>`).join("")}</div>`:"";
 
