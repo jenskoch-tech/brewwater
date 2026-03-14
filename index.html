@@ -1,1 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BrewWater AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,700;0,900&display=swap" rel="stylesheet" />
+  <style>
 
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0c0e0f; --surface: #141618; --surface2: #1a1d1f;
+      --border: #222527; --border2: #2e3235;
+      --text: #e8e6e1; --muted: #6b7280; --muted2: #4b5563;
+      --amber: #d97706; --amber-l: #fbbf24; --amber-dim: rgba(217,119,6,0.1);
+      --green: #22c55e; --green-dim: rgba(34,197,94,0.1);
+      --blue: #3b82f6; --blue-dim: rgba(59,130,246,0.1);
+      --red: #ef4444; --red-dim: rgba(239,68,68,0.1);
+      --purple: #a855f7; --purple-dim: rgba(168,85,247,0.1);
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: 'Fraunces', Georgia, serif; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+    input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 2px; background: var(--border2); outline: none; cursor: pointer; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--amber); cursor: pointer; box-shadow: 0 0 0 3px rgba(217,119,6,0.2); }
+    input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--amber); cursor: pointer; border: none; }
+    header { border-bottom: 1px solid var(--border); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: rgba(12,14,15,0.95); backdrop-filter: blur(12px); z-index: 100; }
+    .logo { display: flex; align-items: center; gap: 11px; }
+    .logo-icon { width: 34px; height: 34px; background: var(--amber); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
+    .logo h1 { font-size: 1.15rem; font-weight: 900; letter-spacing: -0.02em; line-height: 1; }
+    .logo p { font-size: 9px; font-family: 'DM Mono', monospace; color: var(--amber); text-transform: uppercase; letter-spacing: 0.12em; margin-top: 2px; }
+    .ai-btn { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border2); border-radius: 9px; padding: 7px 13px; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 11px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .ai-btn:hover, .ai-btn.active { border-color: var(--amber); color: var(--amber-l); background: var(--amber-dim); }
+    main { max-width: 1180px; margin: 0 auto; padding: 24px 18px; display: grid; grid-template-columns: 360px 1fr; gap: 18px; }
+    @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 12px; }
+    .card:last-child { margin-bottom: 0; }
+    .card-head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .card-title { font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .card-body { padding: 16px; }
+    .badge { font-family: 'DM Mono', monospace; font-size: 9px; padding: 3px 9px; border-radius: 20px; font-weight: 500; }
+    .upload-zone { border: 2px dashed var(--border2); border-radius: 11px; padding: 13px 15px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 11px; margin-bottom: 12px; }
+    .upload-zone:hover { border-color: var(--amber); background: var(--amber-dim); }
+    .upload-zone.loading { opacity: 0.6; pointer-events: none; border-color: var(--amber); }
+    .upload-text p:first-child { font-size: 12px; font-weight: 700; }
+    .upload-text p:last-child { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); margin-top: 2px; }
+    .toggle-row { display: flex; align-items: center; gap: 11px; margin-bottom: 12px; }
+    .toggle-track { width: 38px; height: 21px; background: var(--border2); border-radius: 11px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+    .toggle-track.on { background: var(--amber); }
+    .toggle-thumb { width: 15px; height: 15px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    .toggle-track.on .toggle-thumb { transform: translateX(17px); }
+    .toggle-label p:first-child { font-size: 12px; font-weight: 700; }
+    .toggle-label p:last-child { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--muted); }
+    .ro-slider-wrap { background: var(--surface2); border-radius: 11px; padding: 14px; margin-bottom: 12px; }
+    .ro-slider-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .ro-slider-head span:first-child { font-size: 12px; font-weight: 700; }
+    .ro-pct { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 700; color: var(--amber-l); }
+    .ro-labels { display: flex; justify-content: space-between; font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted); margin-top: 6px; }
+    .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; transition: opacity 0.25s; }
+    .input-grid.dim { opacity: 0.25; pointer-events: none; }
+    .field label { display: block; font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin-bottom: 4px; }
+    .field .iw { position: relative; }
+    .field input { width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: 7px; padding: 8px 34px 8px 10px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; outline: none; transition: border-color 0.2s; }
+    .field input:focus { border-color: var(--amber); }
+    .field .unit { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted); pointer-events: none; }
+    .brew-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 11px; }
+    select { width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: 7px; padding: 8px 10px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 12px; outline: none; cursor: pointer; appearance: none; transition: border-color 0.2s; }
+    select:focus { border-color: var(--amber); }
+    .style-pill { background: var(--bg); border-radius: 9px; padding: 10px 12px; display: flex; gap: 9px; align-items: flex-start; }
+    .scat { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--amber); text-transform: uppercase; letter-spacing: 0.1em; }
+    .sdesc { font-size: 11px; color: var(--muted); margin-top: 2px; font-style: italic; }
+    .calc-btn { width: 100%; background: var(--amber); color: #000; border: none; border-radius: 11px; padding: 15px; font-family: 'Fraunces', serif; font-size: 15px; font-weight: 900; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 18px rgba(217,119,6,0.3); }
+    .calc-btn:hover { background: var(--amber-l); transform: translateY(-1px); }
+    .calc-btn:active { transform: translateY(0); }
+    .empty { min-height: 360px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 2px dashed var(--border); border-radius: 14px; padding: 36px; }
+    .empty .big { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
+    .empty h3 { font-size: 1.05rem; font-weight: 700; color: #444; margin-bottom: 6px; }
+    .empty p { font-size: 12px; color: var(--muted); max-width: 200px; line-height: 1.5; }
+    .results { display: flex; flex-direction: column; gap: 12px; }
+    .warn-box { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); border-radius: 11px; padding: 12px 14px; }
+    .warn-box .wt { font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #fca5a5; margin-bottom: 6px; }
+    .warn-box p { font-size: 12px; color: rgba(252,165,165,0.8); margin-bottom: 3px; }
+    .profile-compare { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); }
+    .pc-col { background: var(--surface); padding: 14px; }
+    .pc-col:first-child { border-radius: 0 0 0 13px; }
+    .pc-col:last-child { border-radius: 0 0 13px 0; }
+    .pc-head { font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .pc-head.src { color: var(--muted); }
+    .pc-head.tgt { color: var(--amber); }
+    .pc-head.adj { color: var(--green); }
+    .pc-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+    .pc-ion { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .pc-val { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 700; }
+    .pc-val.over { color: var(--amber-l); }
+    .pc-val.good { color: var(--green); }
+    .pc-unit { font-size: 9px; color: var(--muted2); margin-left: 2px; }
+    .add-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; padding: 13px; }
+    @media(max-width:480px) { .add-grid { grid-template-columns: 1fr 1fr; } }
+    .add-card { background: var(--bg); border: 1px solid var(--border2); border-radius: 10px; padding: 12px; }
+    .add-card.none { opacity: 0.28; }
+    .add-formula { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--amber); text-transform: uppercase; margin-bottom: 3px; }
+    .add-name { font-size: 11px; font-weight: 700; margin-bottom: 7px; }
+    .add-val { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 700; color: var(--amber-l); line-height: 1; }
+    .add-card.none .add-val { color: var(--muted2); font-size: 15px; }
+    .add-unit { font-size: 9px; color: var(--muted); margin-top: 2px; }
+    .bar-item { margin-bottom: 12px; }
+    .bar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+    .bar-lbl { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .bar-val { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 700; }
+    .bar-val.over { color: var(--amber-l); }
+    .bar-track { height: 5px; background: var(--bg); border-radius: 3px; position: relative; overflow: hidden; }
+    .bar-src { position: absolute; top: 0; left: 0; bottom: 0; background: rgba(255,255,255,0.08); border-radius: 3px; }
+    .bar-fill { position: absolute; top: 0; left: 0; bottom: 0; background: var(--amber); border-radius: 3px; transition: width 0.9s cubic-bezier(0.34,1.56,0.64,1); }
+    .bar-fill.over { background: var(--amber-l); }
+    .bar-tgt { position: absolute; top: -2px; bottom: -2px; width: 2px; background: rgba(255,255,255,0.45); }
+    .bar-foot { display: flex; justify-content: space-between; font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted2); margin-top: 3px; }
+    .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-card { background: var(--surface2); border-radius: 11px; padding: 14px 16px; }
+    .stat-label { font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 10px; }
+    .gauge-wrap { display: flex; flex-direction: column; align-items: center; }
+    .gauge-wrap svg { width: 140px; }
+    .gauge-label { font-size: 13px; font-weight: 900; margin-top: 4px; }
+    .gauge-desc { font-size: 10px; color: var(--muted); font-style: italic; margin-top: 2px; }
+    .ra-card { border-radius: 11px; padding: 14px 16px; }
+    .ra-card.pale { background: var(--blue-dim); border: 1px solid rgba(59,130,246,0.2); }
+    .ra-card.balanced { background: var(--green-dim); border: 1px solid rgba(34,197,94,0.2); }
+    .ra-card.dark { background: var(--purple-dim); border: 1px solid rgba(168,85,247,0.2); }
+    .ra-label { font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+    .ra-val { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 700; line-height: 1; }
+    .ra-interp { font-size: 12px; font-weight: 700; margin-top: 5px; }
+    .ra-desc { font-size: 11px; color: var(--muted); margin-top: 3px; font-style: italic; }
+    .insight { display: flex; gap: 9px; align-items: flex-start; font-size: 12px; color: #9ca3af; line-height: 1.5; margin-bottom: 9px; font-style: italic; }
+    .insight-arr { color: var(--amber); flex-shrink: 0; font-style: normal; }
+    .insight.wi { color: #fca5a5; }
+    .insight.wi .insight-arr { color: var(--red); }
+    .modal-ov { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .modal-ov.open { opacity: 1; pointer-events: all; }
+    .modal { background: #141618; border: 1px solid var(--border2); border-radius: 18px; padding: 24px; width: 100%; max-width: 420px; position: relative; transform: translateY(8px); transition: transform 0.2s; }
+    .modal-ov.open .modal { transform: translateY(0); }
+    .modal h2 { font-size: 1.1rem; font-weight: 900; margin-bottom: 5px; }
+    .modal p { font-size: 12px; color: var(--muted); line-height: 1.55; margin-bottom: 13px; }
+    .modal a { color: var(--amber-l); }
+    .modal input[type=password] { width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: 9px; padding: 10px 12px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; outline: none; margin-bottom: 10px; transition: border-color 0.2s; }
+    .modal input[type=password]:focus { border-color: var(--amber); }
+    .modal-save { width: 100%; background: var(--amber); color: #000; border: none; border-radius: 9px; padding: 11px; font-family: 'Fraunces', serif; font-size: 14px; font-weight: 900; cursor: pointer; transition: background 0.15s; }
+    .modal-save:hover { background: var(--amber-l); }
+    .modal-close { position: absolute; top: 14px; right: 14px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 19px; line-height: 1; }
+    .modal-close:hover { color: var(--text); }
+    .modal-rm { width: 100%; background: none; border: none; color: var(--muted); font-size: 11px; cursor: pointer; margin-top: 6px; padding: 7px; transition: color 0.15s; }
+    .modal-rm:hover { color: var(--red); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 15px; height: 15px; border: 2px solid rgba(217,119,6,0.25); border-top-color: var(--amber); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+    .fade-in { animation: fadeUp 0.35s ease both; }
+    footer { max-width: 1180px; margin: 0 auto; padding: 16px 18px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: var(--muted); font-family: 'DM Mono', monospace; }
+    @media(max-width:500px) { footer { flex-direction: column; gap: 4px; text-align: center; } }
+    .icon-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 17px; line-height: 1; transition: color 0.15s; }
+    .icon-btn:hover { color: var(--amber); }
+
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🧪</div>
+    <div><h1>BrewWater AI</h1><p>Water Chemistry Calculator</p></div>
+  </div>
+  <button class="ai-btn" id="aiBtn">⚡ <span id="aiLabel">AI Setup</span></button>
+</header>
+
+<main>
+  <div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">💧 Water Source</span></div>
+      <div class="card-body">
+        <input type="file" id="reportFile" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none" />
+        <div class="upload-zone" id="uploadZone">
+          <span id="uploadIcon" style="font-size:19px;flex-shrink:0">✨</span>
+          <div class="upload-text">
+            <p id="uploadTitle">Setup AI Report Scanner</p>
+            <p id="uploadSub">Add your free Gemini key to scan water reports</p>
+          </div>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-track" id="roToggle"><div class="toggle-thumb"></div></div>
+          <div class="toggle-label"><p>Start with RO / Distilled Water</p><p>Treats source minerals as 0 ppm</p></div>
+        </div>
+        <div class="ro-slider-wrap" id="dilutionWrap">
+          <div class="ro-slider-head">
+            <span>RO Dilution Blend</span>
+            <span class="ro-pct" id="dilutionPct">0%</span>
+          </div>
+          <input type="range" id="dilutionSlider" min="0" max="100" value="0" step="5" />
+          <div class="ro-labels"><span>Source only</span><span>50/50 blend</span><span>Pure RO</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">🔬 Source Water Profile</span>
+        <button class="icon-btn" id="resetBtn" title="Reset">↺</button>
+      </div>
+      <div class="card-body"><div class="input-grid" id="inputGrid"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">🍺 Brew Settings</span></div>
+      <div class="card-body">
+        <div class="brew-row">
+          <div class="field">
+            <label>Batch Size</label>
+            <div class="iw"><input type="number" id="batchSize" value="20" min="1" step="1"/><span class="unit">L</span></div>
+          </div>
+          <div class="field">
+            <label>Target Style</label>
+            <select id="styleSelect"></select>
+          </div>
+        </div>
+        <div class="style-pill" id="stylePill"></div>
+      </div>
+    </div>
+
+    <button class="calc-btn" id="calcBtn">⚗️ Calculate Water Adjustments</button>
+  </div>
+
+  <div id="resultsArea">
+    <div class="empty">
+      <div class="big">🍻</div>
+      <h3>Ready to Calculate</h3>
+      <p>Fill in your source water, choose a target style, and hit Calculate.</p>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>BrewWater AI — Always verify mash pH with a calibrated meter</span>
+  <span>Chemistry data: Palmer, How to Brew 4th Ed.</span>
+</footer>
+
+<div class="modal-ov" id="modal">
+  <div class="modal">
+    <button class="modal-close" id="modalClose">✕</button>
+    <h2>✨ AI Report Scanner</h2>
+    <p>Paste your <a href="https://aistudio.google.com/apikey" target="_blank">Gemini API key</a> (free tier ~1500 req/day). BrewWater AI uses it to read mineral values from your water lab report — PDF or photo. Stored only in your browser.</p>
+    <input type="password" id="apiKeyInput" placeholder="AIza..." />
+    <button class="modal-save" id="modalSave">Save Key</button>
+    <button class="modal-rm" id="modalRm" style="display:none">Remove key</button>
+  </div>
+</div>
+
+<script>
+
+const STYLES = [
+  {id:"ipa",     name:"IPA (American)",       cat:"Hop-Forward",   desc:"High sulfate sharpens bitterness and dries the finish",      t:{ca:100,mg:10,na:15,cl:50, so4:200,hco3:50}},
+  {id:"neipa",   name:"New England IPA",      cat:"Hop-Forward",   desc:"High chloride promotes soft, juicy hop character",           t:{ca:100,mg:10,na:20,cl:180,so4:60, hco3:50}},
+  {id:"wc_ipa",  name:"West Coast IPA",       cat:"Hop-Forward",   desc:"Very high sulfate for aggressive, resinous bitterness",      t:{ca:120,mg:10,na:15,cl:50, so4:250,hco3:40}},
+  {id:"pilsner", name:"Pilsner (Bohemian)",   cat:"Lager",         desc:"Extremely soft water highlights delicate hop aroma",         t:{ca:40, mg:5, na:10,cl:40, so4:30, hco3:20}},
+  {id:"lager",   name:"Lager (Munich)",       cat:"Lager",         desc:"Moderate balanced profile, slightly mineral",                t:{ca:60, mg:10,na:15,cl:60, so4:50, hco3:60}},
+  {id:"helles",  name:"Munich Helles",        cat:"Lager",         desc:"Soft water highlights bready malt sweetness",               t:{ca:60, mg:10,na:10,cl:60, so4:50, hco3:50}},
+  {id:"marzen",  name:"Marzen / Oktoberfest", cat:"Lager",         desc:"Malt-forward with moderate balanced minerals",              t:{ca:70, mg:10,na:15,cl:70, so4:60, hco3:70}},
+  {id:"stout",   name:"Stout (Dry Irish)",    cat:"Dark",          desc:"High bicarbonate supports roasted grain character",          t:{ca:80, mg:10,na:30,cl:100,so4:50, hco3:150}},
+  {id:"porter",  name:"Porter (English)",     cat:"Dark",          desc:"Balanced with elevated bicarbonate for smooth roast",        t:{ca:80, mg:15,na:25,cl:75, so4:60, hco3:100}},
+  {id:"wheat",   name:"Hefeweizen",           cat:"Wheat",         desc:"Soft and balanced, preserves delicate esters",              t:{ca:60, mg:10,na:15,cl:60, so4:60, hco3:50}},
+  {id:"amber",   name:"Amber Ale",            cat:"Malt-Forward",  desc:"Balanced profile to support caramel malt character",        t:{ca:80, mg:15,na:20,cl:80, so4:100,hco3:80}},
+  {id:"saison",  name:"Saison / Farmhouse",   cat:"Belgian",       desc:"Moderately sulfate-forward, dry and spicy finish",          t:{ca:80, mg:10,na:20,cl:50, so4:120,hco3:60}},
+  {id:"blonde",  name:"Blonde Ale",           cat:"Malt-Forward",  desc:"Light, clean, low mineral profile throughout",              t:{ca:50, mg:5, na:10,cl:50, so4:50, hco3:40}},
+];
+
+const SALTS = {
+  gypsum:          {label:"Gypsum",           formula:"CaSO4",  ca:61.5, so4:147.4, mg:0,  na:0,  cl:0,   hco3:0  },
+  calciumChloride: {label:"Calcium Chloride", formula:"CaCl2",  ca:72,   so4:0,     mg:0,  na:0,  cl:127, hco3:0  },
+  epsomSalt:       {label:"Epsom Salt",       formula:"MgSO4",  ca:0,    so4:103,   mg:26, na:0,  cl:0,   hco3:0  },
+  bakingSoda:      {label:"Baking Soda",      formula:"NaHCO3", ca:0,    so4:0,     mg:0,  na:72, cl:0,   hco3:191},
+  chalk:           {label:"Chalk",            formula:"CaCO3",  ca:106,  so4:0,     mg:0,  na:0,  cl:0,   hco3:158},
+};
+
+const ION_FIELDS = [
+  {key:"ca",  label:"Calcium (Ca)",       unit:"ppm", step:1  },
+  {key:"mg",  label:"Magnesium (Mg)",     unit:"ppm", step:1  },
+  {key:"na",  label:"Sodium (Na)",        unit:"ppm", step:1  },
+  {key:"cl",  label:"Chloride (Cl)",      unit:"ppm", step:1  },
+  {key:"so4", label:"Sulfate (SO4)",      unit:"ppm", step:1  },
+  {key:"hco3",label:"Bicarbonate (HCO3)",unit:"ppm", step:1  },
+  {key:"ph",  label:"Water pH",           unit:"pH",  step:0.1},
+];
+
+const S = {
+  profile: {ca:0,mg:0,na:0,cl:0,so4:0,hco3:0,ph:7.0},
+  styleId: STYLES[0].id,
+  batch: 20,
+  ro: false,
+  dilution: 0,
+  apiKey: localStorage.getItem("bw_key") || "",
+};
+
+function applyDilution(p, pct) {
+  if (!pct) return {...p};
+  const f = 1 - pct/100;
+  return {ca:+(p.ca*f).toFixed(1),mg:+(p.mg*f).toFixed(1),na:+(p.na*f).toFixed(1),cl:+(p.cl*f).toFixed(1),so4:+(p.so4*f).toFixed(1),hco3:+(p.hco3*f).toFixed(1),ph:p.ph};
+}
+
+function calcRA(ca, mg, hco3) { return hco3 - (ca/3.5 + mg/7); }
+
+function calc() {
+  const style = STYLES.find(s => s.id === S.styleId);
+  const t = style.t;
+  const f = (S.batch||20) / 10;
+  const base = S.ro ? {ca:0,mg:0,na:0,cl:0,so4:0,hco3:0,ph:S.profile.ph} : applyDilution(S.profile, S.dilution);
+  const add = {gypsum:0,calciumChloride:0,epsomSalt:0,bakingSoda:0,chalk:0};
+  const gn = (def, ppm) => Math.max(0, (def/ppm)*f);
+  const pf = (g, ppm) => (g/f)*ppm;
+  const cap = (g, sk, ik, cur) => {
+    const maxP = (t[ik]||0)*1.10;
+    const addP = pf(g, SALTS[sk][ik]);
+    if (cur+addP > maxP) { const ok=Math.max(0,maxP-cur); return gn(ok, SALTS[sk][ik]); }
+    return g;
+  };
+
+  if (base.mg < t.mg) { let g=gn(t.mg-base.mg,SALTS.epsomSalt.mg); add.epsomSalt=cap(g,"epsomSalt","mg",base.mg); }
+  const sNa=base.na<t.na?gn(t.na-base.na,SALTS.bakingSoda.na):0;
+  const sHco=base.hco3<t.hco3?gn(t.hco3-base.hco3,SALTS.bakingSoda.hco3):0;
+  if (Math.max(sNa,sHco)>0) { const di=sNa>=sHco?"na":"hco3"; add.bakingSoda=cap(Math.max(sNa,sHco),"bakingSoda",di,base[di]); }
+
+  const mid={ca:base.ca,mg:base.mg+pf(add.epsomSalt,SALTS.epsomSalt.mg),na:base.na+pf(add.bakingSoda,SALTS.bakingSoda.na),so4:base.so4+pf(add.epsomSalt,SALTS.epsomSalt.so4),cl:base.cl,hco3:base.hco3+pf(add.bakingSoda,SALTS.bakingSoda.hco3)};
+
+  if (t.so4 >= t.cl) {
+    if(mid.so4<t.so4){let g=gn(t.so4-mid.so4,SALTS.gypsum.so4);add.gypsum=cap(g,"gypsum","so4",mid.so4);}
+    if(mid.cl<t.cl){let g=gn(t.cl-mid.cl,SALTS.calciumChloride.cl);add.calciumChloride=cap(g,"calciumChloride","cl",mid.cl);}
+  } else {
+    if(mid.cl<t.cl){let g=gn(t.cl-mid.cl,SALTS.calciumChloride.cl);add.calciumChloride=cap(g,"calciumChloride","cl",mid.cl);}
+    if(mid.so4<t.so4){let g=gn(t.so4-mid.so4,SALTS.gypsum.so4);add.gypsum=cap(g,"gypsum","so4",mid.so4);}
+  }
+
+  const caAft=mid.ca+pf(add.gypsum,SALTS.gypsum.ca)+pf(add.calciumChloride,SALTS.calciumChloride.ca);
+  if(caAft<t.ca){let g=gn(t.ca-caAft,SALTS.chalk.ca);add.chalk=cap(g,"chalk","ca",caAft);}
+
+  const fin={
+    ca:  Math.round(mid.ca+pf(add.gypsum,SALTS.gypsum.ca)+pf(add.calciumChloride,SALTS.calciumChloride.ca)+pf(add.chalk,SALTS.chalk.ca)),
+    mg:  Math.round(mid.mg),
+    na:  Math.round(mid.na),
+    so4: Math.round(mid.so4+pf(add.gypsum,SALTS.gypsum.so4)),
+    cl:  Math.round(mid.cl+pf(add.calciumChloride,SALTS.calciumChloride.cl)),
+    hco3:Math.round(mid.hco3+pf(add.chalk,SALTS.chalk.hco3)),
+  };
+
+  const ratio=fin.so4/(fin.cl||1);
+  let rl="Balanced",rd="Even bitter and malty balance";
+  if(ratio>=3){rl="Very Hop-Forward";rd="Assertive, dry bitterness";}
+  else if(ratio>=2){rl="Hop-Forward";rd="Bitterness and dryness emphasised";}
+  else if(ratio<=0.5){rl="Very Malt-Forward";rd="Rich, full, smooth body";}
+  else if(ratio<1){rl="Malt-Forward";rd="Soft, round, malt character";}
+
+  const ra=calcRA(fin.ca,fin.mg,fin.hco3);
+  let raC="balanced",raI="Balanced water profile",raD="Suitable for most styles";
+  if(ra<0){raC="pale";raI="Suitable for pale beers";raD="Low alkalinity — great for lagers, IPAs, pilsners";}
+  else if(ra>100){raC="dark";raI="Better for dark beers";raD="High alkalinity — good for stouts, porters, dark ales";}
+
+  const IONS=[{k:"ca",l:"Calcium"},{k:"mg",l:"Magnesium"},{k:"na",l:"Sodium"},{k:"cl",l:"Chloride"},{k:"so4",l:"Sulfate"},{k:"hco3",l:"Bicarbonate"}];
+  const warnings=IONS.filter(({k})=>fin[k]>(t[k]||0)*1.15).map(({k,l})=>`${l} (${fin[k]} ppm) slightly exceeds style target of ${t[k]} ppm.`);
+
+  const ins=[];
+  if(fin.so4>150)ins.push({t:"i",m:"High sulfate (>150 ppm) enhances hop bitterness and dryness."});
+  if(fin.cl>100) ins.push({t:"i",m:"High chloride (>100 ppm) enhances malt roundness and body."});
+  if(fin.hco3>100)ins.push({t:"i",m:"High bicarbonate raises mash alkalinity — consider acid additions to hit target mash pH."});
+  if(fin.ca>=50) ins.push({t:"i",m:"Calcium above 50 ppm supports enzyme activity and yeast health."});
+  if(fin.mg>30)  ins.push({t:"w",m:"Magnesium above 30 ppm can add astringency — keep it moderate."});
+  if(add.chalk>0)ins.push({t:"w",m:"Chalk dissolves poorly unless the wort is acidified first."});
+  if(add.gypsum>0)ins.push({t:"i",m:"Gypsum adds calcium and sulfate — classic for hop-forward styles."});
+  if(add.calciumChloride>0)ins.push({t:"i",m:"Calcium chloride softens the palate and promotes malt character."});
+  if(!ins.length)ins.push({t:"i",m:"Your source water closely matches this style — minimal additions needed!"});
+
+  const src2=S.ro?{ca:0,mg:0,na:0,cl:0,so4:0,hco3:0}:applyDilution(S.profile,S.dilution);
+  const suited=[],notSuited=[];
+  STYLES.forEach(st=>{
+    const keys=["ca","so4","cl","hco3"];
+    const avg=keys.reduce((a,k)=>a+Math.abs((src2[k]||0)-(st.t[k]||1))/(st.t[k]||1),0)/keys.length;
+    (avg<0.4?suited:notSuited).push(st.name);
+  });
+
+  return {
+    add:{gypsum:+add.gypsum.toFixed(2),calciumChloride:+add.calciumChloride.toFixed(2),epsomSalt:+add.epsomSalt.toFixed(2),bakingSoda:+add.bakingSoda.toFixed(2),chalk:+add.chalk.toFixed(2)},
+    base:{ca:Math.round(base.ca),mg:Math.round(base.mg),na:Math.round(base.na),cl:Math.round(base.cl),so4:Math.round(base.so4),hco3:Math.round(base.hco3)},
+    fin,t,ratio:+ratio.toFixed(2),rl,rd,ra:+ra.toFixed(1),raC,raI,raD,warnings,ins,style,suited:suited.slice(0,4),notSuited:notSuited.slice(0,4),
+  };
+}
+
+function render(r) {
+  const IONS=[{k:"ca",l:"Ca"},{k:"mg",l:"Mg"},{k:"na",l:"Na"},{k:"cl",l:"Cl"},{k:"so4",l:"SO4"},{k:"hco3",l:"HCO3"}];
+  const LONS=[{k:"ca",l:"Calcium"},{k:"mg",l:"Magnesium"},{k:"na",l:"Sodium"},{k:"cl",l:"Chloride"},{k:"so4",l:"Sulfate"},{k:"hco3",l:"Bicarbonate"}];
+  const SL=[{key:"gypsum",...SALTS.gypsum},{key:"calciumChloride",...SALTS.calciumChloride},{key:"epsomSalt",...SALTS.epsomSalt},{key:"bakingSoda",...SALTS.bakingSoda},{key:"chalk",...SALTS.chalk}];
+
+  const warnH=r.warnings.length?`<div class="warn-box fade-in"><div class="wt">Note</div>${r.warnings.map(w=>`<p>- ${w}</p>`).join("")}</div>`:"";
+
+  const pcH=`<div class="card fade-in" style="margin-bottom:12px">
+    <div class="card-head"><span class="card-title">Profile Comparison</span><span class="badge" style="background:var(--amber-dim);color:var(--amber-l)">${S.batch}L</span></div>
+    <div class="profile-compare">
+      <div class="pc-col">
+        <div class="pc-head src">Source Water</div>
+        ${IONS.map(({k,l})=>`<div class="pc-row"><span class="pc-ion">${l}</span><span class="pc-val">${r.base[k]}<span class="pc-unit">ppm</span></span></div>`).join("")}
+      </div>
+      <div class="pc-col">
+        <div class="pc-head tgt">Target (${r.style.name})</div>
+        ${IONS.map(({k,l})=>`<div class="pc-row"><span class="pc-ion">${l}</span><span class="pc-val" style="color:var(--amber)">${r.t[k]}<span class="pc-unit">ppm</span></span></div>`).join("")}
+      </div>
+      <div class="pc-col">
+        <div class="pc-head adj">Adjusted Water</div>
+        ${IONS.map(({k,l})=>{const over=r.fin[k]>(r.t[k]||0)*1.15,good=Math.abs(r.fin[k]-(r.t[k]||0))<=(r.t[k]||0)*0.15;return `<div class="pc-row"><span class="pc-ion">${l}</span><span class="pc-val ${over?"over":good?"good":""}">${r.fin[k]}<span class="pc-unit">ppm</span></span></div>`;}).join("")}
+      </div>
+    </div>
+  </div>`;
+
+  const addH=`<div class="card fade-in" style="margin-bottom:12px">
+    <div class="card-head"><span class="card-title">Salt Additions</span><span class="badge" style="background:var(--amber-dim);color:var(--amber-l)">${S.batch}L batch</span></div>
+    <div class="add-grid">${SL.map(s=>{const g=r.add[s.key];return `<div class="add-card ${g===0?"none":""}"><div class="add-formula">${s.formula}</div><div class="add-name">${s.label}</div><div class="add-val">${g===0?"--":g}</div>${g>0?`<div class="add-unit">grams</div>`:""}</div>`;}).join("")}</div>
+  </div>`;
+
+  const barsH=LONS.map(({k,l})=>{const fin=r.fin[k]||0,tgt=r.t[k]||0,src=r.base[k]||0,max=Math.max(fin,tgt,1)*1.2,over=fin>tgt*1.15;return `<div class="bar-item"><div class="bar-header"><span class="bar-lbl">${l}</span><span class="bar-val ${over?"over":""}">${fin} ppm</span></div><div class="bar-track">${src>0?`<div class="bar-src" style="width:${Math.min(src/max*100,100).toFixed(1)}%"></div>`:""}<div class="bar-fill ${over?"over":""}" style="width:0" data-w="${Math.min(fin/max*100,100).toFixed(1)}"></div><div class="bar-tgt" style="left:${Math.min(tgt/max*100,100).toFixed(1)}%"></div></div><div class="bar-foot"><span>0</span><span>target: ${tgt}</span></div></div>`;}).join("");
+
+  const cl=Math.min(r.ratio,4),ang=(-120+(cl/4)*240)*Math.PI/180,nx=(60+38*Math.sin(ang)).toFixed(1),ny=(70-38*Math.cos(ang)).toFixed(1);
+  const rc=r.ratio>=2?"#22c55e":r.ratio<1?"#3b82f6":"#fbbf24";
+  const gaugeH=`<div class="gauge-wrap"><svg viewBox="0 0 120 80"><path d="M 10 70 A 50 50 0 0 1 110 70" fill="none" stroke="#222" stroke-width="10" stroke-linecap="round"/><path d="M 10 70 A 50 50 0 0 1 45 25" fill="none" stroke="#3b82f6" stroke-width="10" stroke-linecap="round" opacity="0.65"/><path d="M 45 25 A 50 50 0 0 1 75 25" fill="none" stroke="#22c55e" stroke-width="10" opacity="0.65"/><path d="M 75 25 A 50 50 0 0 1 110 70" fill="none" stroke="#d97706" stroke-width="10" stroke-linecap="round" opacity="0.65"/><line x1="60" y1="70" x2="${nx}" y2="${ny}" stroke="white" stroke-width="2.5" stroke-linecap="round"/><circle cx="60" cy="70" r="4" fill="white"/><text x="60" y="57" text-anchor="middle" font-size="11" font-weight="bold" fill="${rc}" font-family="monospace">${r.ratio}</text></svg><div class="gauge-label">${r.rl}</div><div class="gauge-desc">${r.rd}</div></div>`;
+
+  const raColors={pale:"#3b82f6",balanced:"#22c55e",dark:"#a855f7"};
+  const raH=`<div class="ra-card ${r.raC}"><div class="ra-label" style="color:${raColors[r.raC]}">Residual Alkalinity</div><div class="ra-val" style="color:${raColors[r.raC]}">${r.ra}</div><div class="ra-interp" style="color:${raColors[r.raC]}">${r.raI}</div><div class="ra-desc">${r.raD}</div></div>`;
+
+  const insH=r.ins.map(i=>`<div class="insight ${i.t==="w"?"wi":""}"><span class="insight-arr">${i.t==="w"?"!":">"}</span><span>${i.m}</span></div>`).join("");
+  const suitH=`${r.suited.map(s=>`<div style="display:flex;align-items:center;gap:7px;font-size:11px;margin-bottom:5px;"><span style="width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;display:inline-block"></span>${s}</div>`).join("")}${r.notSuited.map(s=>`<div style="display:flex;align-items:center;gap:7px;font-size:11px;margin-bottom:5px;color:var(--muted2);"><span style="width:7px;height:7px;border-radius:50%;background:var(--border2);flex-shrink:0;display:inline-block"></span>${s}</div>`).join("")}`;
+
+  document.getElementById("resultsArea").innerHTML=`<div class="results">${warnH}${pcH}${addH}
+    <div class="card fade-in"><div class="card-head"><span class="card-title">Adjusted Profile vs Target</span></div><div class="card-body">${barsH}<div style="font-size:9px;color:var(--muted2);margin-top:6px;font-family:'DM Mono',monospace">dim = source | amber = adjusted | | = target</div></div></div>
+    <div class="stats-row fade-in"><div class="stat-card"><div class="stat-label">SO4 : Cl Ratio</div>${gaugeH}</div><div class="stat-card"><div class="stat-label">Mash pH Risk (Residual Alkalinity)</div>${raH}</div></div>
+    <div class="card fade-in"><div class="card-head"><span class="card-title">Brewing Insights</span></div><div class="card-body">${insH}</div></div>
+    <div class="card fade-in"><div class="card-head"><span class="card-title">Source Water Suitability</span></div><div class="card-body">${suitH}</div></div>
+  </div>`;
+
+  requestAnimationFrame(()=>{document.querySelectorAll(".bar-fill[data-w]").forEach(el=>{el.style.width=el.dataset.w+"%";});});
+}
+
+async function parseAI(file) {
+  const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onloadend=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
+  const prompt=`You are a brewing water chemistry expert. Extract mineral ion values from this water analysis report.\nReturn ONLY valid JSON in exactly this format with no other text:\n{"calcium":0,"magnesium":0,"sodium":0,"chloride":0,"sulfate":0,"bicarbonate":0,"ph":7}\nRules: All values in mg/L (ppm). Swiss/German m-Wert in mmol/L multiply by 61 for bicarbonate. If not found use 0.`;
+  const body={contents:[{parts:[{inline_data:{mime_type:file.type,data:b64}},{text:prompt}]}],generationConfig:{temperature:0,maxOutputTokens:256}};
+  const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${S.apiKey}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(resp.status===429)throw new Error("Rate limit — wait a moment and try again.");
+  if(resp.status===400)throw new Error("Invalid API key or request.");
+  if(!resp.ok)throw new Error(`API error ${resp.status}`);
+  const data=await resp.json();
+  const raw=data.candidates?.[0]?.content?.parts?.[0]?.text||"";
+  const s=raw.indexOf("{"),e=raw.lastIndexOf("}");
+  if(s===-1||e===-1)throw new Error("No JSON found in AI response. Try a clearer photo.");
+  const parsed=JSON.parse(raw.slice(s,e+1));
+  if(!["calcium","magnesium","sodium","chloride","sulfate","bicarbonate"].some(k=>+parsed[k]>0))throw new Error("AI could not find mineral values. Try a higher quality image.");
+  return parsed;
+}
+
+function buildInputs(){
+  document.getElementById("inputGrid").innerHTML=ION_FIELDS.map(f=>`<div class="field"><label>${f.label}</label><div class="iw"><input type="number" id="f_${f.key}" value="${S.profile[f.key]||""}" placeholder="0" step="${f.step}" min="0"/><span class="unit">${f.unit}</span></div></div>`).join("");
+  ION_FIELDS.forEach(f=>{document.getElementById("f_"+f.key).addEventListener("input",e=>{S.profile[f.key]=parseFloat(e.target.value)||0;});});
+}
+function syncInputs(){ION_FIELDS.forEach(f=>{const el=document.getElementById("f_"+f.key);if(el)el.value=(f.key==="ph")?S.profile.ph:(S.profile[f.key]||"");});}
+function buildStyles(){const sel=document.getElementById("styleSelect");sel.innerHTML=STYLES.map(s=>`<option value="${s.id}">${s.name}</option>`).join("");sel.value=S.styleId;refreshPill();sel.addEventListener("change",e=>{S.styleId=e.target.value;refreshPill();});}
+function refreshPill(){const s=STYLES.find(x=>x.id===S.styleId);document.getElementById("stylePill").innerHTML=`<span style="font-size:17px">🍺</span><div><div class="scat">${s.cat}</div><div class="sdesc">${s.desc}</div></div>`;}
+function updateAIUI(){document.getElementById("aiLabel").textContent=S.apiKey?"AI Active":"AI Setup";document.getElementById("aiBtn").classList.toggle("active",!!S.apiKey);document.getElementById("uploadTitle").textContent=S.apiKey?"Scan Water Report (AI)":"Setup AI Report Scanner";document.getElementById("uploadSub").textContent=S.apiKey?"Upload PDF or photo — AI extracts your mineral values":"Add your free Gemini key to enable report scanning";}
+
+document.getElementById("aiBtn").addEventListener("click",()=>{document.getElementById("apiKeyInput").value=S.apiKey;document.getElementById("modalRm").style.display=S.apiKey?"block":"none";document.getElementById("modal").classList.add("open");});
+document.getElementById("modalClose").addEventListener("click",()=>document.getElementById("modal").classList.remove("open"));
+document.getElementById("modal").addEventListener("click",e=>{if(e.target===document.getElementById("modal"))document.getElementById("modal").classList.remove("open");});
+document.getElementById("modalSave").addEventListener("click",()=>{const k=document.getElementById("apiKeyInput").value.trim();S.apiKey=k;k?localStorage.setItem("bw_key",k):localStorage.removeItem("bw_key");document.getElementById("modal").classList.remove("open");updateAIUI();});
+document.getElementById("modalRm").addEventListener("click",()=>{S.apiKey="";localStorage.removeItem("bw_key");document.getElementById("modal").classList.remove("open");updateAIUI();});
+
+document.getElementById("uploadZone").addEventListener("click",()=>{if(!S.apiKey){document.getElementById("apiKeyInput").value="";document.getElementById("modalRm").style.display="none";document.getElementById("modal").classList.add("open");return;}document.getElementById("reportFile").click();});
+document.getElementById("reportFile").addEventListener("change",async e=>{
+  const file=e.target.files[0];if(!file)return;e.target.value="";
+  const zone=document.getElementById("uploadZone");zone.classList.add("loading");
+  document.getElementById("uploadIcon").innerHTML='<div class="spinner"></div>';
+  document.getElementById("uploadTitle").textContent="Reading with AI...";
+  document.getElementById("uploadSub").textContent="Gemini is extracting your mineral values";
+  try{
+    const d=await parseAI(file);
+    S.profile={ca:+(d.calcium||0),mg:+(d.magnesium||0),na:+(d.sodium||0),cl:+(d.chloride||0),so4:+(d.sulfate||0),hco3:+(d.bicarbonate||0),ph:+(d.ph||7.0)};
+    S.ro=false;S.dilution=0;
+    document.getElementById("roToggle").classList.remove("on");
+    document.getElementById("inputGrid").classList.remove("dim");
+    document.getElementById("dilutionSlider").value=0;
+    document.getElementById("dilutionPct").textContent="0%";
+    document.getElementById("dilutionWrap").style.opacity="1";
+    document.getElementById("dilutionWrap").style.pointerEvents="all";
+    syncInputs();
+    alert("Report parsed! Check values below then hit Calculate.");
+  }catch(err){alert("Could not parse report.\n\n"+err.message);}
+  finally{zone.classList.remove("loading");document.getElementById("uploadIcon").textContent="✨";updateAIUI();}
+});
+
+document.getElementById("roToggle").addEventListener("click",()=>{S.ro=!S.ro;document.getElementById("roToggle").classList.toggle("on",S.ro);document.getElementById("inputGrid").classList.toggle("dim",S.ro);const dw=document.getElementById("dilutionWrap");dw.style.opacity=S.ro?"0.3":"1";dw.style.pointerEvents=S.ro?"none":"all";});
+document.getElementById("dilutionSlider").addEventListener("input",e=>{S.dilution=+e.target.value;document.getElementById("dilutionPct").textContent=S.dilution+"%";});
+document.getElementById("batchSize").addEventListener("input",e=>{S.batch=parseFloat(e.target.value)||20;});
+document.getElementById("resetBtn").addEventListener("click",()=>{S.profile={ca:0,mg:0,na:0,cl:0,so4:0,hco3:0,ph:7.0};S.ro=false;S.dilution=0;document.getElementById("roToggle").classList.remove("on");document.getElementById("inputGrid").classList.remove("dim");document.getElementById("dilutionSlider").value=0;document.getElementById("dilutionPct").textContent="0%";document.getElementById("dilutionWrap").style.opacity="1";document.getElementById("dilutionWrap").style.pointerEvents="all";syncInputs();document.getElementById("resultsArea").innerHTML='<div class="empty"><div class="big">🍻</div><h3>Ready to Calculate</h3><p>Fill in your source water, choose a target style, and hit Calculate.</p></div>';});
+document.getElementById("calcBtn").addEventListener("click",()=>{render(calc());setTimeout(()=>document.getElementById("resultsArea").scrollIntoView({behavior:"smooth",block:"start"}),60);});
+
+buildInputs();buildStyles();updateAIUI();
+
+</script>
+</body>
+</html>
