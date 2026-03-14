@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -177,12 +177,12 @@
     <div class="card">
       <div class="card-head"><span class="card-title">💧 Water Source</span></div>
       <div class="card-body">
-        <input type="file" id="reportFile" accept=".pdf,.jpg,.jpeg,.png,.webp" style="display:none" />
+        <input type="file" id="reportFile" accept=".pdf,.jpg,.jpeg,.png,.webp,.gif" style="display:none" />
         <div class="upload-zone" id="uploadZone">
           <span id="uploadIcon" style="font-size:19px;flex-shrink:0">✨</span>
           <div class="upload-text">
             <p id="uploadTitle">Setup AI Report Scanner</p>
-            <p id="uploadSub">Add your free Gemini key to scan water reports</p>
+            <p id="uploadSub">Add your Anthropic key to scan water reports</p>
           </div>
         </div>
         <div class="toggle-row">
@@ -246,7 +246,7 @@
   <div class="modal">
     <button class="modal-close" id="modalClose">✕</button>
     <h2>✨ AI Report Scanner</h2>
-    <p>Paste your <a href="https://aistudio.google.com/apikey" target="_blank">Gemini API key</a> (free tier ~1500 req/day). BrewWater AI uses it to read mineral values from your water lab report — PDF or photo. Stored only in your browser.</p>
+    <p>Paste your <a href="https://console.anthropic.com/settings/keys" target="_blank">Anthropic API key</a>. BrewWater AI uses <strong>Claude Haiku</strong> to read your water lab report (PDF or photo). Costs fractions of a cent per scan. Key stored only in your browser, never sent to any server.</p>
     <input type="password" id="apiKeyInput" placeholder="AIza..." />
     <button class="modal-save" id="modalSave">Save Key</button>
     <button class="modal-rm" id="modalRm" style="display:none">Remove key</button>
@@ -442,19 +442,62 @@ function render(r) {
 }
 
 async function parseAI(file) {
-  const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onloadend=()=>res(r.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
-  const prompt=`You are a brewing water chemistry expert. Extract mineral ion values from this water analysis report.\nReturn ONLY valid JSON in exactly this format with no other text:\n{"calcium":0,"magnesium":0,"sodium":0,"chloride":0,"sulfate":0,"bicarbonate":0,"ph":7}\nRules: All values in mg/L (ppm). Swiss/German m-Wert in mmol/L multiply by 61 for bicarbonate. If not found use 0.`;
-  const body={contents:[{parts:[{inline_data:{mime_type:file.type,data:b64}},{text:prompt}]}],generationConfig:{temperature:0,maxOutputTokens:256}};
-  const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${S.apiKey}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  if(resp.status===429)throw new Error("Rate limit — wait a moment and try again.");
-  if(resp.status===400)throw new Error("Invalid API key or request.");
-  if(!resp.ok)throw new Error(`API error ${resp.status}`);
-  const data=await resp.json();
-  const raw=data.candidates?.[0]?.content?.parts?.[0]?.text||"";
-  const s=raw.indexOf("{"),e=raw.lastIndexOf("}");
-  if(s===-1||e===-1)throw new Error("No JSON found in AI response. Try a clearer photo.");
-  const parsed=JSON.parse(raw.slice(s,e+1));
-  if(!["calcium","magnesium","sodium","chloride","sulfate","bicarbonate"].some(k=>+parsed[k]>0))throw new Error("AI could not find mineral values. Try a higher quality image.");
+  const b64 = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onloadend = () => res(r.result.split(",")[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+
+  const prompt = `You are a brewing water chemistry expert. Extract mineral ion values from this water analysis report.
+Return ONLY valid JSON in exactly this format with absolutely no other text:
+{"calcium":0,"magnesium":0,"sodium":0,"chloride":0,"sulfate":0,"bicarbonate":0,"ph":7}
+Rules:
+- All values in mg/L (ppm)
+- Swiss/German: m-Wert or Saurekapazitat in mmol/L x 61 = bicarbonate ppm
+- Karbonatharte in degrees dH x 17.84 = bicarbonate ppm
+- If multiple sampling points, use main supply or Reservoir
+- Missing values = 0
+- Return only the JSON, nothing else`;
+
+  const isPdf = file.type === "application/pdf";
+  const contentPart = isPdf
+    ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: b64 } }
+    : { type: "image",    source: { type: "base64", media_type: file.type,          data: b64 } };
+
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": S.apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 300,
+      messages: [{ role: "user", content: [contentPart, { type: "text", text: prompt }] }]
+    })
+  });
+
+  if (resp.status === 401) throw new Error("Invalid Anthropic API key. Check and try again.");
+  if (resp.status === 429) throw new Error("Rate limit reached. Wait a moment and try again.");
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error("Claude API error: " + (err?.error?.message || resp.status));
+  }
+
+  const data = await resp.json();
+  const raw = data.content?.[0]?.text || "";
+
+  // Extract JSON block robustly
+  const s = raw.indexOf("{"), e = raw.lastIndexOf("}");
+  if (s === -1 || e === -1) throw new Error("No JSON in Claude response. Try a clearer image.");
+  const parsed = JSON.parse(raw.slice(s, e + 1));
+
+  if (!["calcium","magnesium","sodium","chloride","sulfate","bicarbonate"].some(k => +parsed[k] > 0))
+    throw new Error("Claude could not read mineral values. Try a higher quality photo or PDF.");
+
   return parsed;
 }
 
@@ -465,7 +508,7 @@ function buildInputs(){
 function syncInputs(){ION_FIELDS.forEach(f=>{const el=document.getElementById("f_"+f.key);if(el)el.value=(f.key==="ph")?S.profile.ph:(S.profile[f.key]||"");});}
 function buildStyles(){const sel=document.getElementById("styleSelect");sel.innerHTML=STYLES.map(s=>`<option value="${s.id}">${s.name}</option>`).join("");sel.value=S.styleId;refreshPill();sel.addEventListener("change",e=>{S.styleId=e.target.value;refreshPill();});}
 function refreshPill(){const s=STYLES.find(x=>x.id===S.styleId);document.getElementById("stylePill").innerHTML=`<span style="font-size:17px">🍺</span><div><div class="scat">${s.cat}</div><div class="sdesc">${s.desc}</div></div>`;}
-function updateAIUI(){document.getElementById("aiLabel").textContent=S.apiKey?"AI Active":"AI Setup";document.getElementById("aiBtn").classList.toggle("active",!!S.apiKey);document.getElementById("uploadTitle").textContent=S.apiKey?"Scan Water Report (AI)":"Setup AI Report Scanner";document.getElementById("uploadSub").textContent=S.apiKey?"Upload PDF or photo — AI extracts your mineral values":"Add your free Gemini key to enable report scanning";}
+function updateAIUI(){document.getElementById("aiLabel").textContent=S.apiKey?"AI Active":"AI Setup";document.getElementById("aiBtn").classList.toggle("active",!!S.apiKey);document.getElementById("uploadTitle").textContent=S.apiKey?"Scan Water Report (AI)":"Setup AI Report Scanner";document.getElementById("uploadSub").textContent=S.apiKey?"Upload PDF or photo — AI extracts your mineral values":"Add your Anthropic API key to enable report scanning";}
 
 document.getElementById("aiBtn").addEventListener("click",()=>{document.getElementById("apiKeyInput").value=S.apiKey;document.getElementById("modalRm").style.display=S.apiKey?"block":"none";document.getElementById("modal").classList.add("open");});
 document.getElementById("modalClose").addEventListener("click",()=>document.getElementById("modal").classList.remove("open"));
@@ -478,8 +521,8 @@ document.getElementById("reportFile").addEventListener("change",async e=>{
   const file=e.target.files[0];if(!file)return;e.target.value="";
   const zone=document.getElementById("uploadZone");zone.classList.add("loading");
   document.getElementById("uploadIcon").innerHTML='<div class="spinner"></div>';
-  document.getElementById("uploadTitle").textContent="Reading with AI...";
-  document.getElementById("uploadSub").textContent="Gemini is extracting your mineral values";
+  document.getElementById("uploadTitle").textContent="Reading with Claude...";
+  document.getElementById("uploadSub").textContent="Claude is reading your water report...";
   try{
     const d=await parseAI(file);
     S.profile={ca:+(d.calcium||0),mg:+(d.magnesium||0),na:+(d.sodium||0),cl:+(d.chloride||0),so4:+(d.sulfate||0),hco3:+(d.bicarbonate||0),ph:+(d.ph||7.0)};
